@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    env_file: .env
+    environment:
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "4000:4000"
+
+  frontend:
+    build: ./client
+    env_file: .env
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
