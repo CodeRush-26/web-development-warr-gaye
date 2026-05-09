@@ -36,6 +36,17 @@ Open the frontend at `http://localhost:5173`.
 
 The project uses a root `.env` file for local development. Example values are available in `.env.example`.
 
+For Vercel, configure the project environment variables under Vercel dashboard instead of using `.env`.
+Set these values for the frontend build and any hosted backend:
+
+- `VITE_API_URL`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `DATABASE_URL` (if you deploy the backend or use Supabase Postgres directly)
+
 ## Supabase / database notes
 
 This implementation currently runs against a PostgreSQL data layer. The backend expects a valid `DATABASE_URL` in the root `.env` file.
