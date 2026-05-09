@@ -11,8 +11,11 @@ services:
   backend:
     build:
       context: .
-      dockerfile: ./server/Dockerfile
+      dockerfile: server/Dockerfile
     env_file: .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "4000:4000"
     depends_on:
@@ -20,10 +23,13 @@ services:
   frontend:
     build: ./client
     env_file: .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     environment:
       - VITE_API_URL=http://backend:4000
     ports:
-      - "5173:4173"
+      - "5173:5173"
     depends_on:
       - backend
 

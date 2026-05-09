@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./db');
 
-const fleetJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fleet.json'), 'utf8'));
+const fleetPath = path.join(__dirname, 'fleet.json');
+const fleetJson = JSON.parse(fs.readFileSync(fleetPath, 'utf8'));
 
 async function ensureSchema() {
   await db.query(`
