@@ -1,0 +1,27 @@
+# =========================
+# FRONTEND (VITE + SUPABASE)
+# =========================
+VITE_SUPABASE_URL=https://hkblecqbzjuhcbgoxwiq.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_yDZKZsfCcQ_4ZHC7Pe_tkg_yszmeTN0
+
+VITE_API_URL=http://localhost:4000
+
+
+# =========================
+# BACKEND (SUPABASE)
+# =========================
+SUPABASE_URL=https://hkblecqbzjuhcbgoxwiq.supabase.co
+SUPABASE_ANON_KEY=sb_publishable_yDZKZsfCcQ_4ZHC7Pe_tkg_yszmeTN0
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYmxlY3Fiemp1aGNiZ294d2lxIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIiLCJpYXQiOjE3NzgzMTEzNDIsImV4cCI6MjA5Mzg4NzM0Mn0.ivFh2VYlETmeAunn6jp53YRcTgutNjXXoWfcjP8wes
+
+
+# =========================
+# DATABASE (SUPABASE POOLER)
+# =========================
+DATABASE_URL=postgresql://postgres.hkblecqbzjuhcbgoxwiq:Coderush12340@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres
+
+
+# =========================
+# APP CONFIG
+# =========================
+PORT=4000
