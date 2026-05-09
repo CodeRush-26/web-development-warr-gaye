@@ -1,9 +1,22 @@
 services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fleet_command
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
   backend:
-    build: ./server
+    build:
+      context: .
+      dockerfile: ./server/Dockerfile
     env_file: .env
     ports:
       - "4000:4000"
+    depends_on:
+      - db
   frontend:
     build: ./client
     env_file: .env
@@ -13,3 +26,6 @@ services:
       - "5173:4173"
     depends_on:
       - backend
+
+volumes:
+  postgres_data:
