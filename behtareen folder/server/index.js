@@ -3,19 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
-
-const db = require('./db');
 const simulator = require('./simulator');
 
 const PORT = process.env.PORT || 4000;
-
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const server = http.createServer(app);
-
 const io = new Server(server, {
   cors: {
     origin: true,
@@ -25,6 +20,9 @@ const io = new Server(server, {
 
 io.on('connection', (socket) => {
   socket.emit('state.update', simulator.getState());
+  socket.on('disconnect', () => {
+    console.log(`socket disconnected: ${socket.id}`);
+  });
 });
 
 app.get('/api/config', (req, res) => {
@@ -37,10 +35,7 @@ app.get('/api/state', (req, res) => {
 
 app.get('/api/timeline', (req, res) => {
   const state = simulator.getState();
-  res.json({
-    snapshots: state.snapshots,
-    events: state.events,
-  });
+  res.json({ snapshots: state.snapshots, events: state.events });
 });
 
 app.post('/api/zones', async (req, res) => {
@@ -85,14 +80,11 @@ app.post('/api/alerts/ack', async (req, res) => {
 
 server.listen(PORT, async () => {
   console.log(`Backend listening on port ${PORT}`);
-
   try {
-    await db.initialize();
     await simulator.initialize(io);
-
-    console.log('DB + Simulator initialized successfully');
+    console.log('Simulator initialized');
   } catch (error) {
-    console.error('Startup failed:', error);
+    console.error('Simulator failed to initialize', error);
     process.exit(1);
   }
 });

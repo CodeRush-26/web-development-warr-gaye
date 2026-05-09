@@ -231,13 +231,8 @@ async function loadState() {
   const directivesRes = await db.query('SELECT data FROM directives');
   state.directives = directivesRes.rows.map((row) => row.data);
 
-  const eventsRes = await db.query('SELECT data FROM events');
-
-state.events = eventsRes.rows
-  .map((row) => row.data)
-  .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-  .slice(0, 200)
-  .reverse();
+  const eventsRes = await db.query('SELECT data FROM events ORDER BY created_at DESC LIMIT 200');
+  state.events = eventsRes.rows.map((row) => row.data).reverse();
 
   const snapshotsRes = await db.query('SELECT data FROM snapshots ORDER BY timestamp ASC');
   state.snapshots = snapshotsRes.rows.map((row) => row.data);

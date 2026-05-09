@@ -1,19 +1,36 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error('Missing DATABASE_URL. The backend requires a PostgreSQL connection string in the .env file.');
-  console.error('If you are using Supabase, set DATABASE_URL to your Supabase PostgreSQL connection string, or provide SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and update the backend accordingly.');
-  process.exit(1);
-}
+const isProduction = process.env.NODE_ENV === 'production';
 
 const pool = new Pool({
-  connectionString,
+  connectionString: process.env.DATABASE_URL,
+
+  ssl: isProduction
+    ? { rejectUnauthorized: false }
+    : false,
+
   max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
+pool.on('error', (err) => {
+  console.error('Unexpected PostgreSQL error:', err);
+});
+
+console.log('PostgreSQL pool initialized');
+
 module.exports = {
+  initialize: async () => {
+    try {
+      await pool.query('SELECT 1');
+      console.log('Database connection successful');
+    } catch (err) {
+      console.error('Database connection failed:', err);
+      throw err;
+    }
+  },
+
   query: (text, params) => pool.query(text, params),
-  pool,
 };
