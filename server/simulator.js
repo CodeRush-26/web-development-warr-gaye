@@ -417,34 +417,22 @@ async function tick(io) {
 
 async function refreshWeather(force = false) {
   try {
-    console.log("refreshWeather called");
-
-    const latitude = 26.5;
-    const longitude = 55.0;
-
-    // Use wttr.in free weather API to avoid the current daily limit issue.
-    const url = `https://wttr.in/${latitude},${longitude}?format=j1`;
-
-    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=26.5&longitude=55.0&current=wind_speed_10m,precipitation&wind_speed_unit=kmh`;
+    const response = await fetch(url);
     const data = await response.json();
-
-    console.log("WEATHER API RESPONSE:", response.status, data);
-
-    if (!response.ok || !data || !Array.isArray(data.current_condition) || data.current_condition.length === 0) {
-      const reason = data?.error || `status ${response.status}`;
-      console.warn(`Weather API failed (${reason}), keeping previous data`);
-      nextWeatherRetryAt = Date.now() + WEATHER_BACKOFF_MS;
-
-      if (!isValidWeather(state.weather.current)) {
-        console.warn('Weather API unavailable, using fallback weather values');
-        state.weather = fallbackWeather();
-        createEvent('weather_update', {
-          current: state.weather.current,
-          risk: extractWeatherRisk(),
-        });
-      }
-
-      return;
+    if (data && data.current) {
+      state.weather = {
+        updatedAt: Date.now(),
+        current: {
+          windspeed: data.current.wind_speed_10m || 0,
+          precipitation: data.current.precipitation || 0,
+          weathercode: 0,
+        },
+      };
+      createEvent('weather_update', {
+        current: state.weather.current,
+        risk: extractWeatherRisk()
+      });
     }
 
     const current = data.current_condition[0];
@@ -486,7 +474,6 @@ async function refreshWeather(force = false) {
     return;
   }
 }
-
 async function initialize(io) {
   await ensureSchema();
   await loadState();
