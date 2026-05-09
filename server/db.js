@@ -15,6 +15,13 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
+// ✅ IMPORTANT FIX: prevent statement timeout crashes
+pool.on('connect', (client) => {
+  client.query('SET statement_timeout = 0'); // disables query killing
+  client.query('SET idle_in_transaction_session_timeout = 0');
+});
+
+// optional logging
 pool.on('error', (err) => {
   console.error('Unexpected PostgreSQL error:', err);
 });

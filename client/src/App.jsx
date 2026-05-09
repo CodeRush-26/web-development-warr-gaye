@@ -35,6 +35,9 @@ function App() {
   const isCommand = role === 'command';
   const canDraw = isCommand;
 
+  const wind = state.weather?.current?.windspeed;
+  const rain = state.weather?.current?.precipitation;
+
   useEffect(() => {
     const socket = io(API_BASE, { transports: ['websocket'] });
     socketRef.current = socket;
@@ -139,8 +142,15 @@ function App() {
           <h2>{isCommand ? 'Command Dashboard' : 'Captain Dashboard'}</h2>
           <p>Role: <strong>{role}</strong></p>
           {role === 'captain' && <p>Ship: <strong>{shipId}</strong></p>}
-          <p>Weather: <strong>{state.weather?.current ? `${state.weather.current.windspeed} km/h wind, ${state.weather.current.precipitation} mm rain` : 'loading'}</strong></p>
-          <p>Risk Level: <strong>{state.weather?.current ? (state.weather.current.windspeed >= 15 || state.weather.current.precipitation >= 2 ? 'Adverse' : 'Normal') : '—'}</strong></p>
+          
+          <p>
+            Weather: <strong>
+              {wind !== undefined && rain !== undefined
+                ? `${wind} km/h wind, ${rain} mm rain`
+                : 'loading'}
+            </strong>
+          </p>
+          <p>Risk Level: <strong>{state.weather?.current ? (wind >= 15 || rain   >= 2 ? 'Adverse' : 'Normal') : '—'}</strong></p>
         </div>
 
         <div className="panel">

@@ -1,4 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
+// remove node-fetch completely
 const db = require('./db');
 const { ensureSchema, seedShips, getInitialConfig } = require('./init-db');
 const {
@@ -10,7 +11,7 @@ const {
   normalizeHeading,
 } = require('./utils');
 
-const WEATHER_REFRESH_MS = 60 * 1000;
+const WEATHER_REFRESH_MS = 30 * 1000; // 30 seconds for testing
 const SNAPSHOT_INTERVAL_MS = 30 * 1000;
 const HISTORY_RETENTION_MS = 60 * 60 * 1000;
 
@@ -222,16 +223,26 @@ async function loadState() {
   const shipsRes = await db.query('SELECT data FROM ships');
   state.ships = shipsRes.rows.map((row) => row.data);
 
-  const zonesRes = await db.query('SELECT data FROM zones');
+  const zonesRes = await db.query('SELECT data FROM zones LIMIT 100');
   state.zones = zonesRes.rows.map((row) => row.data);
 
-  const alertsRes = await db.query('SELECT data FROM alerts');
+  const alertsRes = await db.query(`
+  SELECT data 
+  FROM alerts 
+  ORDER BY created_at DESC 
+  LIMIT 200
+`);
   state.alerts = alertsRes.rows.map((row) => row.data);
 
   const directivesRes = await db.query('SELECT data FROM directives');
   state.directives = directivesRes.rows.map((row) => row.data);
 
-  const eventsRes = await db.query('SELECT data FROM events');
+  const eventsRes = await db.query(`
+  SELECT data 
+  FROM events 
+  ORDER BY created_at DESC 
+  LIMIT 200
+`);
 
 state.events = eventsRes.rows
   .map((row) => row.data)
@@ -239,7 +250,9 @@ state.events = eventsRes.rows
   .slice(0, 200)
   .reverse();
 
-  const snapshotsRes = await db.query('SELECT data FROM snapshots ORDER BY timestamp ASC');
+  const snapshotsRes = await db.query(
+  'SELECT data FROM snapshots ORDER BY timestamp ASC LIMIT 500'
+);
   state.snapshots = snapshotsRes.rows.map((row) => row.data);
 
   if (state.ships.length === 0) {
@@ -380,33 +393,69 @@ async function tick(io) {
   }
 }
 
-async function refreshWeather() {
+async function refreshWeather(force = false) {
   try {
+    console.log("refreshWeather called");
+
     const latitude = 26.5;
     const longitude = 55.0;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=precipitation,windgusts_10m&timezone=UTC`;
+
+    const url =
+      `https://api.open-meteo.com/v1/forecast` +
+      `?latitude=${latitude}` +
+      `&longitude=${longitude}` +
+      `&current=temperature_2m,precipitation,wind_speed_10m,weather_code` +
+      `&timezone=UTC`;
+
     const response = await fetch(url);
     const data = await response.json();
-    if (data && data.current_weather) {
-      state.weather = {
-        updatedAt: Date.now(),
-        current: {
-          windspeed: data.current_weather.windspeed || 0,
-          temperature: data.current_weather.temperature || 0,
-          weathercode: data.current_weather.weathercode || 0,
-          precipitation: data.hourly?.precipitation?.[0] || 0,
-        },
-      };
-      createEvent('weather_update', { current: state.weather.current, risk: extractWeatherRisk() });
+
+    console.log("WEATHER API RESPONSE:", data);
+
+    // ❗ API error handling (VERY IMPORTANT)
+    if (!data || data.error || !data.current) {
+      console.warn("Weather API failed, keeping previous data");
+
+      // fallback (don’t reset to 0)
+      if (!state.weather.current) {
+        state.weather.current = {
+          windspeed: 0,
+          temperature: 0,
+          weathercode: 0,
+          precipitation: 0,
+        };
+      }
+
+      return;
     }
+
+    // ✅ update state only on valid response
+    state.weather = {
+      updatedAt: Date.now(),
+      current: {
+        windspeed: data.current.wind_speed_10m ?? state.weather.current?.windspeed ?? 0,
+        temperature: data.current.temperature_2m ?? state.weather.current?.temperature ?? 0,
+        weathercode: data.current.weather_code ?? 0,
+        precipitation: data.current.precipitation ?? 0,
+      },
+    };
+
+    createEvent("weather_update", {
+      current: state.weather.current,
+      risk: extractWeatherRisk(),
+    });
   } catch (error) {
-    console.error('weather refresh error', error);
+    console.error("weather refresh error", error);
+
+    // ⚠️ never crash simulation due to weather failure
+    return;
   }
 }
 
 async function initialize(io) {
   await ensureSchema();
   await loadState();
+  console.log("INITIALIZE RUNNING");
   await refreshWeather();
   state.lastSnapshot = Date.now();
   await recordSnapshot();
