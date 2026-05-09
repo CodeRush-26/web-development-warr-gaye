@@ -11,9 +11,11 @@ const {
   normalizeHeading,
 } = require('./utils');
 
-const WEATHER_REFRESH_MS = 30 * 1000; // 30 seconds for testing
+const WEATHER_REFRESH_MS = 15 * 60 * 1000; // 15 minutes between weather checks
+const WEATHER_BACKOFF_MS = 5 * 60 * 1000; // retry after 5 minutes if weather refresh fails
 const SNAPSHOT_INTERVAL_MS = 30 * 1000;
 const HISTORY_RETENTION_MS = 60 * 60 * 1000;
+let nextWeatherRetryAt = 0;
 
 const state = {
   ships: [],
@@ -22,7 +24,7 @@ const state = {
   directives: [],
   events: [],
   snapshots: [],
-  weather: { updatedAt: 0, current: { windspeed: 0, precipitation: 0, weathercode: 0 } },
+  weather: { updatedAt: 0, current: { windspeed: null, precipitation: null, weathercode: null, temperature: null } },
   config: getInitialConfig(),
   lastSnapshot: 0,
 };
@@ -128,6 +130,22 @@ function extractWeatherRisk() {
   if (precipitation >= 4 || windspeed >= 18) return 'high';
   if (precipitation >= 2 || windspeed >= 15) return 'moderate';
   return 'mild';
+}
+
+function isValidWeather(current) {
+  return current && current.windspeed != null && current.precipitation != null && current.temperature != null;
+}
+
+function fallbackWeather() {
+  return {
+    updatedAt: Date.now(),
+    current: {
+      windspeed: 8,
+      temperature: 24,
+      weathercode: 0,
+      precipitation: 0,
+    },
+  };
 }
 
 function createEvent(type, payload) {
@@ -354,9 +372,13 @@ function applyPendingDirectives() {
 
 async function tick(io) {
   const now = Date.now();
-  if (!state.weather.updatedAt || now - state.weather.updatedAt > WEATHER_REFRESH_MS) {
-  await refreshWeather();
-}
+  const shouldRefreshWeather =
+    now >= nextWeatherRetryAt &&
+    (!state.weather.updatedAt || now - state.weather.updatedAt > WEATHER_REFRESH_MS);
+
+  if (shouldRefreshWeather) {
+    await refreshWeather();
+  }
 
   applyPendingDirectives();
 
@@ -400,45 +422,48 @@ async function refreshWeather(force = false) {
     const latitude = 26.5;
     const longitude = 55.0;
 
-    const url =
-      `https://api.open-meteo.com/v1/forecast` +
-      `?latitude=${latitude}` +
-      `&longitude=${longitude}` +
-      `&current=temperature_2m,precipitation,wind_speed_10m,weather_code` +
-      `&timezone=UTC`;
+    // Use wttr.in free weather API to avoid the current daily limit issue.
+    const url = `https://wttr.in/${latitude},${longitude}?format=j1`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
     const data = await response.json();
 
-    console.log("WEATHER API RESPONSE:", data);
+    console.log("WEATHER API RESPONSE:", response.status, data);
 
-    // ❗ API error handling (VERY IMPORTANT)
-    if (!data || data.error || !data.current) {
-      console.warn("Weather API failed, keeping previous data");
+    if (!response.ok || !data || !Array.isArray(data.current_condition) || data.current_condition.length === 0) {
+      const reason = data?.error || `status ${response.status}`;
+      console.warn(`Weather API failed (${reason}), keeping previous data`);
+      nextWeatherRetryAt = Date.now() + WEATHER_BACKOFF_MS;
 
-      // fallback (don’t reset to 0)
-      if (!state.weather.current) {
-        state.weather.current = {
-          windspeed: 0,
-          temperature: 0,
-          weathercode: 0,
-          precipitation: 0,
-        };
+      if (!isValidWeather(state.weather.current)) {
+        console.warn('Weather API unavailable, using fallback weather values');
+        state.weather = fallbackWeather();
+        createEvent('weather_update', {
+          current: state.weather.current,
+          risk: extractWeatherRisk(),
+        });
       }
 
       return;
     }
 
+    const current = data.current_condition[0];
+    const windspeed = Number(current.windspeedKmph ?? current.windspeedMiles ?? 0);
+    const precipitation = Number(current.precipMM ?? 0);
+    const temperature = Number(current.temp_C ?? current.temp_F ?? 0);
+    const weathercode = Number(current.weatherCode ?? 0);
+
     // ✅ update state only on valid response
     state.weather = {
       updatedAt: Date.now(),
       current: {
-        windspeed: data.current.wind_speed_10m ?? state.weather.current?.windspeed ?? 0,
-        temperature: data.current.temperature_2m ?? state.weather.current?.temperature ?? 0,
-        weathercode: data.current.weather_code ?? 0,
-        precipitation: data.current.precipitation ?? 0,
+        windspeed,
+        temperature,
+        weathercode,
+        precipitation,
       },
     };
+    nextWeatherRetryAt = 0;
 
     createEvent("weather_update", {
       current: state.weather.current,
@@ -446,6 +471,16 @@ async function refreshWeather(force = false) {
     });
   } catch (error) {
     console.error("weather refresh error", error);
+    nextWeatherRetryAt = Date.now() + WEATHER_BACKOFF_MS;
+
+    if (!isValidWeather(state.weather.current)) {
+      console.warn('Weather refresh failed, using fallback weather values');
+      state.weather = fallbackWeather();
+      createEvent('weather_update', {
+        current: state.weather.current,
+        risk: extractWeatherRisk(),
+      });
+    }
 
     // ⚠️ never crash simulation due to weather failure
     return;
