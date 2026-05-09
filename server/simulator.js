@@ -354,9 +354,9 @@ function applyPendingDirectives() {
 
 async function tick(io) {
   const now = Date.now();
-  if (now - state.weather.updatedAt > WEATHER_REFRESH_MS) {
-    await refreshWeather();
-  }
+  if (!state.weather.updatedAt || now - state.weather.updatedAt > WEATHER_REFRESH_MS) {
+  await refreshWeather();
+}
 
   applyPendingDirectives();
 
