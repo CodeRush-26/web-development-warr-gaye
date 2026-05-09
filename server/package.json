@@ -1,0 +1,17 @@
+{
+  "name": "fleet-command-server",
+  "private": true,
+  "version": "0.1.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.4",
+    "pg": "^8.12.0",
+    "socket.io": "^4.7.2",
+    "uuid": "^9.0.0"
+  }
+}

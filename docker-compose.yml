@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: ./server
+    env_file: .env
+    ports:
+      - "4000:4000"
+  frontend:
+    build: ./client
+    env_file: .env
+    environment:
+      - VITE_API_URL=http://backend:4000
+    ports:
+      - "5173:4173"
+    depends_on:
+      - backend
